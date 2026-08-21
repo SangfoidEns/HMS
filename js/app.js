@@ -1,104 +1,168 @@
-// Підключення швидких кнопок в DOMContentLoaded
-document.querySelectorAll('.btn-quick-expense').forEach(btn => {
-  btn.addEventListener('click', (e) => {
-    const name = e.target.getAttribute('data-name') || e.target.innerText.trim();
-    document.getElementById('myExpenseNote').value = name;
-    document.getElementById('myExpenseAmount').focus();
-  });
-});
+/**
+ * Advanced Journal Parser for Humans 2.0
+ * Pure functions with zero side-effects.
+ */
 
-// Головна функція перерахунку
-function processAllData() {
-  const rawText = document.getElementById('rawInput').value;
-  saveRawLogs(rawText);
-  
-  parsedRecordsGlobal = parseLogs(rawText);
+// Розбір ваги та бонусів
+export function parseWeightAndBonus(str) {
+  if (!str) return { baseGramm: 0, bonusGramm: 0 };
 
-  let totalRevenue = 0;
-  let totalCash = 0;
-  let totalCard = 0;
-  let totalCostOfGoods = 0;
-  let totalExactWeight = 0;
-  let totalBonusWeight = 0;
-  let totalBonusCost = 0; // Собівартість бонусів
+  const clean = str.toString().toLowerCase().replace(',', '.').trim();
+  let bonusGramm = 0;
+  let baseGramm = 0;
 
-  const clientDebtsMap = {}; // Карта балансу боргів по клієнтах
+  // Витягуємо бонус (!1.5бонус, !1б, !0.5 бонус)
+  const bonusMatch = clean.match(/!(\d*\.?\d+)\s*(?:бонус|б)/);
+  if (bonusMatch) {
+    bonusGramm = parseFloat(bonusMatch[1]) || 0;
+  }
 
-  parsedRecordsGlobal.forEach(r => {
-    totalRevenue += r.eurPaid;
-    if (r.isCard) {
-      totalCard += r.eurPaid;
-    } else {
-      totalCash += r.eurPaid;
-    }
+  // Очищаємо рядок від бонусу для розрахунку базової ваги
+  const pureWeightStr = clean.replace(/!(\d*\.?\d+)\s*(?:бонус|б)/g, '').trim();
 
-    totalExactWeight += r.exactGramm;
-    const bonusExactGramm = r.bonusGramm * 1.1;
-    totalBonusWeight += bonusExactGramm;
+  // Сумуємо математику базової ваги (наприклад: "1+2" або "2.5")
+  const numbers = pureWeightStr.match(/\d*\.?\d+/g);
+  if (numbers) {
+    baseGramm = numbers.reduce((acc, curr) => acc + (parseFloat(curr) || 0), 0);
+  }
 
-    // Розрахунок собівартості
-    const costFor100g = purchases[r.category] || 0;
-    const costPerExactGram = costFor100g / 110; 
-    
-    totalCostOfGoods += (r.exactGramm * costPerExactGram);
-    totalBonusCost += (bonusExactGramm * costPerExactGram);
-
-    // Агрегація боргів
-    if (!clientDebtsMap[r.clientName]) {
-      clientDebtsMap[r.clientName] = { newDebt: 0, repaidDebt: 0 };
-    }
-    clientDebtsMap[r.clientName].newDebt += r.debtNew;
-    clientDebtsMap[r.clientName].repaidDebt += r.debtRepaid;
-  });
-
-  // Розрахунок сумарного активного боргу по всіх клієнтах
-  let totalActiveDebt = 0;
-  Object.keys(clientDebtsMap).forEach(client => {
-    const netDebt = clientDebtsMap[client].newDebt - clientDebtsMap[client].repaidDebt;
-    if (netDebt > 0) {
-      totalActiveDebt += netDebt;
-    }
-  });
-
-  const netProfit = totalRevenue - totalCostOfGoods;
-
-  // Оновлення KPI
-  document.getElementById('kpiRevenue').innerText = `${totalRevenue.toFixed(1)} €`;
-  document.getElementById('kpiNetProfit').innerText = `${netProfit.toFixed(1)} €`;
-  document.getElementById('kpiCashCard').innerText = `${totalCash.toFixed(0)} / ${totalCard.toFixed(0)} €`;
-  document.getElementById('kpiCostOfGoods').innerText = `${totalCostOfGoods.toFixed(1)} €`;
-  document.getElementById('kpiActiveDebt').innerText = `${totalActiveDebt.toFixed(1)} €`; // ТЕПЕР ПОКАЗУЄ АКТУАЛЬНЕ ЗНАЧЕННЯ
-  document.getElementById('kpiExactWeight').innerText = `${totalExactWeight.toFixed(2)} г`;
-  document.getElementById('kpiBonusWeight').innerText = `${totalBonusWeight.toFixed(2)} г`;
-  document.getElementById('kpiDeals').innerText = parsedRecordsGlobal.length;
-
-  // Оновлення блоку "МОЇ"
-  document.getElementById('myCardTotal').innerText = `${totalCard.toFixed(1)} €`;
-  document.getElementById('myBonusCostTotal').innerText = `${totalBonusCost.toFixed(1)} €`;
-
-  renderDebts(clientDebtsMap);
-  renderTable(parsedRecordsGlobal);
+  return { baseGramm, bonusGramm };
 }
 
-function renderDebts(debtsMap) {
-  const activeContainer = document.getElementById('activeDebtsList');
-  const repaidContainer = document.getElementById('repaidDebtsList');
+// Розбір грошей, картки та боргів
+export function parseMoneyAndPaymentType(str) {
+  if (!str) return { eurPaid: 0, isCard: false, debtNew: 0, debtRepaid: 0, rawDebtText: '' };
 
-  let activeHtml = '';
-  let repaidHtml = '';
+  const clean = str.toString().toLowerCase().replace(',', '.').trim();
+  const isCard = clean.includes('карта');
+  let eurPaid = 0;
+  let debtNew = 0;
+  let debtRepaid = 0;
+  let rawDebtText = '';
 
-  Object.keys(debtsMap).forEach(client => {
-    const { newDebt, repaidDebt } = debtsMap[client];
-    const balance = newDebt - repaidDebt;
+  if (clean.includes('долг')) {
+    rawDebtText = clean;
 
-    if (balance > 0) {
-      activeHtml += `<div class="flex justify-between"><span>${client}</span><span class="text-neonRed font-bold">-${balance.toFixed(1)} €</span></div>`;
+    // Парсинг боргів (-20долг, +20долг, 20долг)
+    const newDebtMatch = clean.match(/(-\d*\.?\d+)\s*долг/);
+    const repaidDebtMatch = clean.match(/(?:\+?(\d*\.?\d+))\s*долг/);
+
+    if (newDebtMatch) {
+      debtNew = Math.abs(parseFloat(newDebtMatch[1])) || 0;
+    } else if (repaidDebtMatch && !clean.includes('-')) {
+      debtRepaid = parseFloat(repaidDebtMatch[1]) || 0;
     }
-    if (repaidDebt > 0) {
-      repaidHtml += `<div class="flex justify-between"><span>${client}</span><span class="text-emerald-400 font-bold">+${repaidDebt.toFixed(1)} €</span></div>`;
+
+    // Витягуємо живі гроші (все крім боргів та слова карта)
+    const moneyStr = clean.replace(/[-+]?\d*\.?\d+\s*долг/g, '').replace('карта', '').trim();
+    const moneyMatch = moneyStr.match(/\d*\.?\d+/);
+    if (moneyMatch) {
+      eurPaid = parseFloat(moneyMatch[0]) || 0;
+    }
+  } else {
+    // Звичайна оплата ("50", "50карта", "50 карта")
+    const cleanMoney = clean.replace('карта', '').trim();
+    const matches = cleanMoney.match(/\d*\.?\d+/);
+    if (matches) {
+      eurPaid = parseFloat(matches[0]) || 0;
+    }
+  }
+
+  return { eurPaid, isCard, debtNew, debtRepaid, rawDebtText };
+}
+
+// Розбір дати та часу
+export function parseRecordDateTime(timeStr) {
+  const now = new Date();
+  let year = now.getFullYear();
+  let month = now.getMonth();
+  let day = now.getDate();
+  let hour = 12;
+  let minute = 0;
+
+  if (!timeStr) return now;
+
+  const parts = timeStr.trim().split(/\s+/);
+
+  parts.forEach(p => {
+    if (p.includes(':')) {
+      const hm = p.split(':');
+      hour = parseInt(hm[0], 10) || 0;
+      minute = parseInt(hm[1], 10) || 0;
+    } else if (p.includes('.')) {
+      const dmp = p.split('.');
+      if (dmp[0]) day = parseInt(dmp[0], 10);
+      if (dmp[1]) month = parseInt(dmp[1], 10) - 1;
+      if (dmp[2]) {
+        let y = parseInt(dmp[2], 10);
+        year = y < 100 ? 2000 + y : y;
+      }
     }
   });
 
-  activeContainer.innerHTML = activeHtml || '<p class="text-gray-500">Немає боргів</p>';
-  repaidContainer.innerHTML = repaidHtml || '<p class="text-gray-500">Немає погашень</p>';
+  return new Date(year, month, day, hour, minute);
+}
+
+// Головний парсер всього логу
+export function parseLogs(rawText) {
+  if (!rawText) return [];
+  const lines = rawText.split('\n').map(l => l.trim()).filter(l => l !== '');
+  let currentCategory = 'UNCATEGORIZED';
+  const records = [];
+
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // Детекція категорії
+    if (i + 3 < lines.length && 
+        lines[i+1].toLowerCase() === 'name' && 
+        lines[i+2].toLowerCase() === 'gramm' && 
+        lines[i+3] === '€') {
+      currentCategory = line.toUpperCase();
+      i += 5;
+      continue;
+    }
+
+    // Парсинг транзакції з 4 рядків
+    if (i + 3 < lines.length) {
+      const clientName = lines[i];
+      const rawGramm = lines[i+1];
+      const rawMoney = lines[i+2];
+      const timeStr = lines[i+3];
+
+      if (timeStr.includes(':') || timeStr.includes('.')) {
+        const weightData = parseWeightAndBonus(rawGramm);
+        const moneyData = parseMoneyAndPaymentType(rawMoney);
+        const parsedDateObj = parseRecordDateTime(timeStr);
+
+        // Множимо на 1.1 ТІЛЬКИ базову вагу. Бонус додаємо фактичний (1 до 1)
+        const exactGramm = (weightData.baseGramm * 1.1) + weightData.bonusGramm;
+
+        records.push({
+          id: `${parsedDateObj.getTime()}_${Math.random().toString(36).substr(2, 5)}`,
+          category: currentCategory,
+          clientName,
+          rawGramm,
+          baseGramm: weightData.baseGramm,
+          bonusGramm: weightData.bonusGramm, // Чистий фактичний бонус
+          totalBaseGramm: weightData.baseGramm + weightData.bonusGramm,
+          exactGramm,
+          rawMoney,
+          eurPaid: moneyData.eurPaid,
+          isCard: moneyData.isCard,
+          debtNew: moneyData.debtNew,
+          debtRepaid: moneyData.debtRepaid,
+          rawDebtText: moneyData.rawDebtText,
+          timeStr,
+          parsedDateObj
+        });
+
+        i += 4;
+        continue;
+      }
+    }
+    i++;
+  }
+  return records;
 }
