@@ -1,5 +1,5 @@
 /**
- * Application Core Controller
+ * Main Application Module
  */
 
 import { parseLogs } from './parser.js';
@@ -33,7 +33,6 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnCalculate').addEventListener('click', processAllData);
   document.getElementById('btnAddPurchase').addEventListener('click', handleAddPurchase);
 
-  // Фіксація кнопок періодів графіків
   document.querySelectorAll('.btn-period').forEach(btn => {
     btn.addEventListener('click', (e) => {
       document.querySelectorAll('.btn-period').forEach(b => {
@@ -144,7 +143,6 @@ function processAllData() {
 
   parsedRecordsGlobal = parseLogs(rawText);
 
-  // Створення категорії за замовчуванням при її відсутності
   parsedRecordsGlobal.forEach(r => {
     if (r.category && r.category !== 'UNCATEGORIZED' && purchases[r.category] === undefined) {
       purchases[r.category] = 600;
@@ -174,13 +172,12 @@ function processAllData() {
 
     totalExactWeight += r.exactGramm;
     
-    // ЧИСТИЙ БОНУС (без 1.1)
     const bonusGramm = r.bonusGramm;
     totalBonusWeight += bonusGramm;
 
     const costFor100g = purchases[r.category] || 0;
-    const costPerExactGram = costFor100g / 110; // Вартість точного граму бази
-    const costPerRawGram = costFor100g / 100;    // Вартість чистого граму бонусу
+    const costPerExactGram = costFor100g / 110; 
+    const costPerRawGram = costFor100g / 100;
 
     const baseCost = (r.baseGramm * 1.1) * costPerExactGram;
     const bonusCost = bonusGramm * costPerRawGram;
@@ -188,7 +185,6 @@ function processAllData() {
     totalCostOfGoods += (baseCost + bonusCost);
     totalBonusCost += bonusCost;
 
-    // Агрегація боргів по клієнтах
     if (!clientDebtsMap[r.clientName]) {
       clientDebtsMap[r.clientName] = { newDebt: 0, repaidDebt: 0 };
     }
@@ -196,7 +192,6 @@ function processAllData() {
     clientDebtsMap[r.clientName].repaidDebt += r.debtRepaid;
   });
 
-  // Активний борг = Сума реальних залишків у борг по кожному клієнту
   let totalActiveDebt = 0;
   Object.keys(clientDebtsMap).forEach(client => {
     const netDebt = clientDebtsMap[client].newDebt - clientDebtsMap[client].repaidDebt;
@@ -207,7 +202,6 @@ function processAllData() {
 
   const netProfit = totalRevenue - totalCostOfGoods;
 
-  // Вивід KPI
   document.getElementById('kpiRevenue').innerText = `${totalRevenue.toFixed(1)} €`;
   document.getElementById('kpiNetProfit').innerText = `${netProfit.toFixed(1)} €`;
   document.getElementById('kpiCashCard').innerText = `${totalCash.toFixed(0)} / ${totalCard.toFixed(0)} €`;
@@ -217,7 +211,6 @@ function processAllData() {
   document.getElementById('kpiBonusWeight').innerText = `${totalBonusWeight.toFixed(2)} г`;
   document.getElementById('kpiDeals').innerText = parsedRecordsGlobal.length;
 
-  // Оновлення "МОЇ"
   document.getElementById('myCardTotal').innerText = `${totalCard.toFixed(1)} €`;
   document.getElementById('myBonusCostTotal').innerText = `${totalBonusCost.toFixed(1)} €`;
 
