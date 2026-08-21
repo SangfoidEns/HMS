@@ -1,9 +1,9 @@
 /**
- * Advanced Parsing Engine for Humans 2.0
+ * Advanced Journal Parser for Humans 2.0
  * Pure functions with zero side-effects.
  */
 
-// Точний розрахунок ваги та бонусів
+// Розбір ваги та бонусів
 export function parseWeightAndBonus(str) {
   if (!str) return { baseGramm: 0, bonusGramm: 0 };
 
@@ -11,16 +11,16 @@ export function parseWeightAndBonus(str) {
   let bonusGramm = 0;
   let baseGramm = 0;
 
-  // Шукаємо бонус: !1.5бонус, !1бонус, !0.5 б
+  // Витягуємо бонус (!1.5бонус, !1б, !0.5 бонус)
   const bonusMatch = clean.match(/!(\d*\.?\d+)\s*(?:бонус|б)/);
   if (bonusMatch) {
     bonusGramm = parseFloat(bonusMatch[1]) || 0;
   }
 
-  // Видаляємо блок бонусу, щоб порахувати базову вагу
+  // Очищаємо рядок від бонусу для розрахунку базової ваги
   const pureWeightStr = clean.replace(/!(\d*\.?\d+)\s*(?:бонус|б)/g, '').trim();
 
-  // Рахуємо суму чисел у базовій вазі (наприклад: "1+2" або "2.5")
+  // Сумуємо математику базової ваги (наприклад: "1+2" або "2.5")
   const numbers = pureWeightStr.match(/\d*\.?\d+/g);
   if (numbers) {
     baseGramm = numbers.reduce((acc, curr) => acc + (parseFloat(curr) || 0), 0);
@@ -29,7 +29,7 @@ export function parseWeightAndBonus(str) {
   return { baseGramm, bonusGramm };
 }
 
-// Точний розрахунок грошей, картки та боргів
+// Розбір грошей, картки та боргів
 export function parseMoneyAndPaymentType(str) {
   if (!str) return { eurPaid: 0, isCard: false, debtNew: 0, debtRepaid: 0, rawDebtText: '' };
 
@@ -42,7 +42,8 @@ export function parseMoneyAndPaymentType(str) {
 
   if (clean.includes('долг')) {
     rawDebtText = clean;
-    // Парсимо борги: -20долг (новий борг) або +20долг / 20долг (погашення)
+
+    // Парсинг боргів (-20долг, +20долг, 20долг)
     const newDebtMatch = clean.match(/(-\d*\.?\d+)\s*долг/);
     const repaidDebtMatch = clean.match(/(?:\+?(\d*\.?\d+))\s*долг/);
 
@@ -52,14 +53,14 @@ export function parseMoneyAndPaymentType(str) {
       debtRepaid = parseFloat(repaidDebtMatch[1]) || 0;
     }
 
-    // Витягуємо чисту оплату (все що не є блоком долгу і не слово карта)
+    // Витягуємо живі гроші (все крім боргів та слова карта)
     const moneyStr = clean.replace(/[-+]?\d*\.?\d+\s*долг/g, '').replace('карта', '').trim();
     const moneyMatch = moneyStr.match(/\d*\.?\d+/);
     if (moneyMatch) {
       eurPaid = parseFloat(moneyMatch[0]) || 0;
     }
   } else {
-    // Звичайна оплата (наприклад: "50" або "50карта" або "50 карта")
+    // Звичайна оплата ("50", "50карта", "50 карта")
     const cleanMoney = clean.replace('карта', '').trim();
     const matches = cleanMoney.match(/\d*\.?\d+/);
     if (matches) {
@@ -70,7 +71,7 @@ export function parseMoneyAndPaymentType(str) {
   return { eurPaid, isCard, debtNew, debtRepaid, rawDebtText };
 }
 
-// Парсинг дати та часу
+// Розбір дати та часу
 export function parseRecordDateTime(timeStr) {
   const now = new Date();
   let year = now.getFullYear();
@@ -102,7 +103,7 @@ export function parseRecordDateTime(timeStr) {
   return new Date(year, month, day, hour, minute);
 }
 
-// Парсер всього тексту журналу
+// Головний парсер всього логу
 export function parseLogs(rawText) {
   if (!rawText) return [];
   const lines = rawText.split('\n').map(l => l.trim()).filter(l => l !== '');
@@ -113,31 +114,30 @@ export function parseLogs(rawText) {
   while (i < lines.length) {
     const line = lines[i];
 
-    // Детекція заголовка категорії
+    // Детекція категорії
     if (i + 3 < lines.length && 
         lines[i+1].toLowerCase() === 'name' && 
         lines[i+2].toLowerCase() === 'gramm' && 
         lines[i+3] === '€') {
       currentCategory = line.toUpperCase();
-      i += 5; // Пропускаємо заголовок і служебні рядки
+      i += 5;
       continue;
     }
 
-    // Парсинг блоку з 4 рядків (Client, Gramm, Money, Time)
+    // Парсинг транзакції з 4 рядків
     if (i + 3 < lines.length) {
       const clientName = lines[i];
       const rawGramm = lines[i+1];
       const rawMoney = lines[i+2];
       const timeStr = lines[i+3];
 
-      // Валідація: 4-й рядок має містити час/дату
       if (timeStr.includes(':') || timeStr.includes('.')) {
         const weightData = parseWeightAndBonus(rawGramm);
         const moneyData = parseMoneyAndPaymentType(rawMoney);
         const parsedDateObj = parseRecordDateTime(timeStr);
 
-        const totalBaseGramm = weightData.baseGramm + weightData.bonusGramm;
-        const exactGramm = totalBaseGramm * 1.1; // Множник 1.1
+        // Множимо на 1.1 ТІЛЬКИ базову вагу. Бонус додаємо фактичний (1 до 1)
+        const exactGramm = (weightData.baseGramm * 1.1) + weightData.bonusGramm;
 
         records.push({
           id: `${parsedDateObj.getTime()}_${Math.random().toString(36).substr(2, 5)}`,
@@ -145,8 +145,8 @@ export function parseLogs(rawText) {
           clientName,
           rawGramm,
           baseGramm: weightData.baseGramm,
-          bonusGramm: weightData.bonusGramm,
-          totalBaseGramm,
+          bonusGramm: weightData.bonusGramm, // Чистий фактичний бонус
+          totalBaseGramm: weightData.baseGramm + weightData.bonusGramm,
           exactGramm,
           rawMoney,
           eurPaid: moneyData.eurPaid,
