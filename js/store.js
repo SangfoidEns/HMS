@@ -1,5 +1,5 @@
 /**
- * LocalStorage Data Persistence Layer
+ * Persistence Layer
  */
 
 const KEYS = {
