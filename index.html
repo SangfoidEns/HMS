@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="uk" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Humans 2.0 — Modular Analytics</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="p-4 bg-[#0B0D14] text-gray-200 font-sans">
+  <div id="app" class="max-w-7xl mx-auto space-y-6">
+    <!-- Header -->
+    <header class="flex justify-between items-center pb-4 border-b border-gray-800">
+      <h1 class="text-xl font-black text-cyan-400">HUMANS 2.0</h1>
+      <div id="liveClock" class="font-mono text-xs text-cyan-400">--:--:--</div>
+    </header>
+
+    <!-- Inputs -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="lg:col-span-2 bg-[#0F121C] p-4 rounded-xl border border-gray-800 flex flex-col">
+        <textarea id="rawInput" class="w-full flex-1 bg-[#0B0D14] border border-gray-800 rounded-lg p-3 text-xs font-mono text-gray-200 resize-none h-40" placeholder="Вставити логи сюди..."></textarea>
+        <button id="btnProcessData" class="mt-3 w-full bg-cyan-400 text-black font-bold text-xs py-2 rounded-lg">ОБРОБИТИ ДАНІ</button>
+      </div>
+
+      <!-- Settings -->
+      <div class="bg-[#0F121C] p-4 rounded-xl border border-gray-800 space-y-4">
+        <h3 class="text-xs font-bold uppercase text-gray-400">Закупівля (€ / 100г)</h3>
+        <div id="procurementList" class="space-y-2"></div>
+        <div class="flex gap-2">
+          <input id="newProcurementName" type="text" placeholder="Сорт" class="w-1/2 bg-[#0B0D14] text-xs p-2 rounded border border-gray-800 uppercase" />
+          <input id="newProcurementCost" type="number" placeholder="€" class="w-1/2 bg-[#0B0D14] text-xs p-2 rounded border border-gray-800" />
+          <button id="btnAddProcurement" class="bg-cyan-400 text-black font-bold text-xs px-3 rounded">+</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div class="bg-[#0F121C] p-3 rounded-lg border border-gray-800">
+        <p class="text-[10px] text-gray-400">ФАКТ (€)</p>
+        <p id="kpiRevenue" class="text-base font-bold font-mono text-white">0.00 €</p>
+      </div>
+      <div class="bg-[#0F121C] p-3 rounded-lg border border-gray-800">
+        <p class="text-[10px] text-gray-400">ЧИСТИЙ ПРИБУТОК</p>
+        <p id="kpiNetProfit" class="text-base font-bold font-mono text-green-400">0.00 €</p>
+      </div>
+      <div class="bg-[#0F121C] p-3 rounded-lg border border-gray-800">
+        <p class="text-[10px] text-gray-400">СЕБЕВАРТІСТЬ</p>
+        <p id="kpiCostOfGoods" class="text-base font-bold font-mono text-red-400">0.00 €</p>
+      </div>
+      <div class="bg-[#0F121C] p-3 rounded-lg border border-gray-800">
+        <p class="text-[10px] text-gray-400">ТОЧНА ВАГА (+10%)</p>
+        <p id="kpiExactWeight" class="text-base font-bold font-mono text-yellow-400">0.00 г</p>
+      </div>
+    </div>
+
+    <!-- Heatmap -->
+    <div class="bg-[#0F121C] p-4 rounded-xl border border-gray-800 space-y-2">
+      <h3 class="text-xs font-bold uppercase text-gray-400">Теплова Карта (24/7)</h3>
+      <div id="heatmapGridRows" class="space-y-1 overflow-x-auto"></div>
+    </div>
+
+    <!-- Charts -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="bg-[#0F121C] p-4 rounded-xl border border-gray-800 h-60">
+        <canvas id="weightChart"></canvas>
+      </div>
+      <div class="bg-[#0F121C] p-4 rounded-xl border border-gray-800 h-60">
+        <canvas id="revenueChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
