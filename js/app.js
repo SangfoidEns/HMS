@@ -1,18 +1,16 @@
 import { parseLogs } from './parser.js';
-import { savePurchases, loadPurchases, saveRawLogs, loadRawLogs, saveMyExpenses, loadMyExpenses } from './store.js';
+import { savePurchases, loadPurchases, saveRawLogs, loadRawLogs } from './store.js';
 import { filterRecordsByPeriod, groupRecordsByTimeSlot } from './analytics.js';
 
 let purchases = {};
-let myExpenses = [];
 let parsedRecordsGlobal = [];
 let currentPeriod = 'week';
 
-let chartRevenue = null;
-let chartWeight = null;
+let chartRevenueInstance = null;
+let chartWeightInstance = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   purchases = loadPurchases();
-  myExpenses = loadMyExpenses();
   
   initNavigation();
   initPurchasesUI();
@@ -28,6 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnCalculate').addEventListener('click', processAllData);
   document.getElementById('btnAddPurchase').addEventListener('click', handleAddPurchase);
   
+  // Фільтри періодів для Сторінки 2
   document.querySelectorAll('.btn-period').forEach(btn => {
     btn.addEventListener('click', (e) => {
       document.querySelectorAll('.btn-period').forEach(b => {
@@ -68,10 +67,10 @@ function processAllData() {
   
   parsedRecordsGlobal = parseLogs(rawText);
 
-  // Авто-виявлення нових сортів у журналах
+  // Синхронізація категорій з закупками
   parsedRecordsGlobal.forEach(r => {
     if (r.category && r.category !== 'UNCATEGORIZED' && purchases[r.category] === undefined) {
-      purchases[r.category] = 600; // Стандартне значення за замовчуванням
+      purchases[r.category] = 600; // Стандартна ціна за закупку 100г
       savePurchases(purchases);
     }
   });
@@ -90,15 +89,19 @@ function processAllData() {
 
   parsedRecordsGlobal.forEach(r => {
     totalRevenue += r.eurPaid;
-    if (r.isCard) totalCard += r.eurPaid;
-    else totalCash += r.eurPaid;
+    if (r.isCard) {
+      totalCard += r.eurPaid;
+    } else {
+      totalCash += r.eurPaid;
+    }
 
     totalExactWeight += r.exactGramm;
     totalBonusWeight += (r.bonusGramm * 1.1);
 
-    // Собівартість для цієї конкретної угоди
+    // Точна себевартість з урахуванням закупівельної ціни та коефіцієнта 1.1
+    // Формула: Ціна за 1г точної ваги = (Ціна за 100г закупки) / (100 * 1.1)
     const costFor100g = purchases[r.category] || 0;
-    const costPerExactGram = costFor100g / (100 * 1.1);
+    const costPerExactGram = costFor100g / 110; 
     const itemCost = r.exactGramm * costPerExactGram;
 
     totalCostOfGoods += itemCost;
@@ -107,9 +110,9 @@ function processAllData() {
     if (r.debtRepaid > 0) clientRepaidDebts[r.clientName] = (clientRepaidDebts[r.clientName] || 0) + r.debtRepaid;
   });
 
-  let netProfit = totalRevenue - totalCostOfGoods;
+  const netProfit = totalRevenue - totalCostOfGoods;
 
-  // KPI Render
+  // Оновлення KPI
   document.getElementById('kpiRevenue').innerText = `${totalRevenue.toFixed(1)} €`;
   document.getElementById('kpiNetProfit').innerText = `${netProfit.toFixed(1)} €`;
   document.getElementById('kpiCashCard').innerText = `${totalCash.toFixed(0)} / ${totalCard.toFixed(0)} €`;
@@ -120,10 +123,16 @@ function processAllData() {
 
   renderDebts(clientNewDebts, clientRepaidDebts);
   renderTable(parsedRecordsGlobal);
+
+  // Якщо активна друга сторінка, оновлюємо і графіки
+  if (!document.getElementById('pageAnalytics').classList.contains('hidden')) {
+    renderAnalyticsPage();
+  }
 }
 
 function initPurchasesUI() {
   const container = document.getElementById('purchasesList');
+  if (!container) return;
   container.innerHTML = Object.keys(purchases).map(cat => `
     <div class="flex justify-between items-center bg-brandDark p-1.5 rounded border border-brandBorder">
       <span class="font-bold text-gray-300">${cat}</span>
@@ -186,25 +195,37 @@ function renderAnalyticsPage() {
   const revenues = labels.map(k => grouped[k].revenue);
   const weights = labels.map(k => grouped[k].weight);
 
-  if (chartRevenue) chartRevenue.destroy();
-  if (chartWeight) chartWeight.destroy();
+  // Знищення старих екземплярів для уникнення Canvas Re-use Error
+  if (chartRevenueInstance) chartRevenueInstance.destroy();
+  if (chartWeightInstance) chartWeightInstance.destroy();
 
   const ctxR = document.getElementById('chartTimeRevenue').getContext('2d');
-  chartRevenue = new Chart(ctxR, {
+  chartRevenueInstance = new Chart(ctxR, {
     type: 'line',
     data: {
       labels,
-      datasets: [{ label: 'Виручка €', data: revenues, borderColor: '#00FF88', backgroundColor: 'rgba(0,255,136,0.1)', fill: true, tension: 0.3 }]
+      datasets: [{
+        label: 'Виручка (€)',
+        data: revenues,
+        borderColor: '#00FF88',
+        backgroundColor: 'rgba(0,255,136,0.1)',
+        fill: true,
+        tension: 0.3
+      }]
     },
     options: { responsive: true, maintainAspectRatio: false }
   });
 
   const ctxW = document.getElementById('chartTimeWeight').getContext('2d');
-  chartWeight = new Chart(ctxW, {
+  chartWeightInstance = new Chart(ctxW, {
     type: 'bar',
     data: {
       labels,
-      datasets: [{ label: 'Вага (г)', data: weights, backgroundColor: '#9D00FF' }]
+      datasets: [{
+        label: 'Точна вага (г)',
+        data: weights,
+        backgroundColor: '#9D00FF'
+      }]
     },
     options: { responsive: true, maintainAspectRatio: false }
   });
