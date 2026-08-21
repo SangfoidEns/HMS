@@ -1,40 +1,35 @@
 /**
- * Data Storage Manager
+ * LocalStorage Data Persistence Layer
  */
 
-const DEFAULT_PURCHASES = {
-  'BANNAN': 600,   // 600€ за 100г
-  'SKITTLES': 660  // 660€ за 100г
+const KEYS = {
+  PURCHASES: 'app_purchases_v2',
+  RAW_LOGS: 'app_raw_logs_v2',
+  MY_EXPENSES: 'app_my_expenses_v2'
 };
 
-export function savePurchases(purchases) {
-  localStorage.setItem('h2_purchases', JSON.stringify(purchases));
+export function savePurchases(data) {
+  localStorage.setItem(KEYS.PURCHASES, JSON.stringify(data));
 }
 
 export function loadPurchases() {
-  const saved = localStorage.getItem('h2_purchases');
-  if (saved) {
-    try { return JSON.parse(saved); } catch(e) { return DEFAULT_PURCHASES; }
-  }
-  return DEFAULT_PURCHASES;
+  const raw = localStorage.getItem(KEYS.PURCHASES);
+  return raw ? JSON.parse(raw) : {};
 }
 
-export function saveRawLogs(rawText) {
-  localStorage.setItem('h2_raw_logs', rawText);
+export function saveRawLogs(text) {
+  localStorage.setItem(KEYS.RAW_LOGS, text);
 }
 
 export function loadRawLogs() {
-  return localStorage.getItem('h2_raw_logs') || '';
+  return localStorage.getItem(KEYS.RAW_LOGS) || '';
 }
 
-export function saveMyExpenses(expenses) {
-  localStorage.setItem('h2_my_expenses', JSON.stringify(expenses));
+export function saveMyExpenses(data) {
+  localStorage.setItem(KEYS.MY_EXPENSES, JSON.stringify(data));
 }
 
 export function loadMyExpenses() {
-  const saved = localStorage.getItem('h2_my_expenses');
-  if (saved) {
-    try { return JSON.parse(saved); } catch(e) { return []; }
-  }
-  return [];
+  const raw = localStorage.getItem(KEYS.MY_EXPENSES);
+  return raw ? JSON.parse(raw) : [];
 }
