@@ -1,5 +1,5 @@
 /**
- * Analytics Data Processing Module
+ * Analytics Module
  */
 
 export function filterRecordsByPeriod(records, period) {
